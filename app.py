@@ -1,115 +1,171 @@
 import streamlit as st
+import re
+import string
+
+# =============================
+# PAGE CONFIG
+# =============================
 st.set_page_config(
     page_title="Kriptografi Keyboard Dvorak",
     layout="centered"
 )
 
-st.title("🩷 Kriptografi Keyboard Dvorak")
-st.write("Aplikasi enkripsi & dekripsi berbasis pergerakan keyboard")
-
-
-# ================= KEYBOARD DVORAK =================
-keyboard = [
-    {"row": 1, "keys": list("PYFGCRL")},
-    {"row": 0, "keys": list("AOEUIDHTNS")},
-    {"row": -1, "keys": list("QJKXBMWVZ")}
-]
-
-def get_pos(h):
-    for r in keyboard:
-        if h in r["keys"]:
-            return r["row"], r["keys"].index(h)
-    return None, None
-
-def get_key(row, col):
-    for r in keyboard:
-        if r["row"] == row and 0 <= col < len(r["keys"]):
-            return r["keys"][col]
-    return "?"
-
-# ================= ENKRIPSI =================
-def encrypt(text):
-    text = text.upper()
-    clean = text.replace(" ", "")
-    if not clean:
-        return ""
-
-    acuan = clean[-1]
-    hasil = ""
-
-    for ch in text:
-        if ch == " ":
-            continue
-
-        ra, ca = get_pos(acuan)
-        rb, cb = get_pos(ch)
-
-        dc = cb - ca
-        dr = rb - ra
-
-        part_c = f"↓{dc}" if dc > 0 else f"↑{abs(dc)}" if dc < 0 else "0"
-        part_r = f"+{dr}" if dr > 0 else f"{dr}" if dr < 0 else "0"
-
-        hasil += part_c + part_r
-        acuan = ch
-
-    return hasil
-
-# ================= DEKRIPSI =================
-def decrypt(cipher, acuan):
-    tokens = re.findall(r"[↑↓]?\d+[+-]\d+", cipher)
-    hasil = ""
-    ref = acuan.upper()
-
-    for t in tokens:
-        m = re.match(r"([↑↓]?)(\d+)([+-])(\d+)", t)
-        if not m:
-            continue
-
-        dir_c = 1 if m.group(1) == "↓" else -1 if m.group(1) == "↑" else 0
-        val_c = int(m.group(2))
-        dir_r = 1 if m.group(3) == "+" else -1
-        val_r = int(m.group(4))
-
-        row, col = get_pos(ref)
-        row_data = next(r for r in keyboard if r["row"] == row)
-
-        col = (col + dir_c * val_c) % len(row_data["keys"])
-        row = max(-1, min(1, row + dir_r * (1 if val_r != 0 else 0)))
-
-        key = get_key(row, col)
-        hasil += key
-        ref = key
-
-    return hasil
-
-# ================= STREAMLIT UI =================
-st.set_page_config(page_title="Kriptografi Dvorak", layout="centered")
-
+# =============================
+# CUSTOM STYLE (HIDUP & NATURAL)
+# =============================
 st.markdown("""
 <style>
-.stApp {
-    background: linear-gradient(160deg, #ffe4ec, #ffd1dc);
+body {
+    background: linear-gradient(180deg, #f6dce3 0%, #fffafc 70%);
 }
+
+.block-container {
+    padding-top: 2.5rem;
+    max-width: 820px;
+}
+
+h1 {
+    color: #3b1f2b;
+    font-weight: 700;
+}
+
+h2 {
+    color: #5a2a3a;
+}
+
+p {
+    color: #3d3d3d;
+}
+
+.card {
+    background: white;
+    border-radius: 14px;
+    padding: 1.5rem;
+    margin-bottom: 1.8rem;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.08);
+}
+
+label {
+    font-weight: 600;
+    color: #5a2a3a;
+}
+
 textarea, input {
+    background-color: #ffffff !important;
+    color: #1f1f1f !important;
     border-radius: 10px !important;
+    border: 1px solid #e0b7c5 !important;
+}
+
+.stButton button {
+    background-color: #b94a6a;
+    color: white;
+    border-radius: 10px;
+    padding: 0.6rem 1.4rem;
+    font-weight: 600;
+    border: none;
+}
+
+.stButton button:hover {
+    background-color: #983c57;
+}
+
+.footer {
+    text-align: center;
+    color: #6b4a56;
+    margin-top: 2rem;
+    font-size: 0.9rem;
 }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🩷 Kriptografi Keyboard Dvorak")
-st.write("Enkripsi & Dekripsi berbasis pergerakan relatif keyboard")
+# =============================
+# DATA
+# =============================
+ALPHABET = string.ascii_uppercase
 
-st.subheader("🔐 Plaintext → Ciphertext")
-pt = st.text_area("Plaintext")
+# =============================
+# ENCRYPT
+# =============================
+def encrypt(plaintext):
+    plaintext = plaintext.upper()
+    prev_index = ALPHABET.index("I")
+    result = []
+
+    for ch in plaintext:
+        if ch in ALPHABET:
+            curr = ALPHABET.index(ch)
+            diff = curr - prev_index
+
+            arrow = "↑" if diff >= 0 else "↓"
+            step = abs(diff) * 10
+            tweak = "+1" if diff >= 0 else "-1"
+
+            result.append(f"{arrow}{step}{tweak}")
+            prev_index = curr
+        else:
+            result.append(ch)
+
+    return "".join(result)
+
+# =============================
+# DECRYPT
+# =============================
+def decrypt(ciphertext, start_char):
+    start_char = start_char.upper()
+
+    if start_char not in ALPHABET:
+        return "Huruf acuan tidak valid"
+
+    tokens = re.findall(r"[↑↓]\d+[+-]1", ciphertext)
+    prev = ALPHABET.index(start_char)
+    result = []
+
+    for t in tokens:
+        arrow = t[0]
+        number = int(t[1:-2])
+        shift = number // 10
+        direction = 1 if arrow == "↑" else -1
+
+        curr = (prev + direction * shift) % 26
+        result.append(ALPHABET[curr])
+        prev = curr
+
+    return "".join(result)
+
+# =============================
+# UI CONTENT
+# =============================
+st.title("Kriptografi Keyboard Dvorak")
+st.write("Aplikasi enkripsi dan dekripsi berbasis pergerakan relatif keyboard Dvorak.")
+
+# ---------- CARD 1 ----------
+st.markdown("<div class='card'>", unsafe_allow_html=True)
+st.subheader("Plaintext → Ciphertext")
+pt = st.text_area("Masukkan Plaintext", height=120)
+
 if st.button("Enkripsi"):
-    st.text_area("Ciphertext", encrypt(pt), height=120)
+    if pt.strip():
+        ct = encrypt(pt)
+        st.text_area("Hasil Ciphertext", ct, height=140)
 
-st.divider()
+st.markdown("</div>", unsafe_allow_html=True)
 
-st.subheader("🔓 Ciphertext → Plaintext")
-ct = st.text_area("Ciphertext")
-ac = st.text_input("Huruf acuan awal")
+# ---------- CARD 2 ----------
+st.markdown("<div class='card'>", unsafe_allow_html=True)
+st.subheader("Ciphertext → Plaintext")
+ct_input = st.text_area("Masukkan Ciphertext", height=140)
+acuan = st.text_input("Huruf acuan awal", value="I")
+
 if st.button("Dekripsi"):
-    if ac:
-        st.text_area("Hasil Plaintext", decrypt(ct, ac), height=120)
+    if ct_input.strip():
+        hasil = decrypt(ct_input, acuan)
+        st.text_area("Hasil Plaintext", hasil, height=120)
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+# ---------- FOOTER ----------
+st.markdown(
+    "<div class='footer'>Dina Ayu Safitri — Kriptografi Keyboard Dvorak</div>",
+    unsafe_allow_html=True
+)
